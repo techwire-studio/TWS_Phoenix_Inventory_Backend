@@ -1,15 +1,14 @@
-import nodemailer from 'nodemailer';
-import fs from 'fs';
-import path from 'path';
+import nodemailer from "nodemailer";
+import fs from "fs";
+import path from "path";
 
 const transporter = nodemailer.createTransport({
-    service: 'gmail',
+    service: "gmail",
     auth: {
         user: process.env.GMAIL_USER,
-        pass: process.env.GMAIL_PASS,
+        pass: process.env.GMAIL_PASS
     }
 });
-
 
 export const sendOrderNotificationToAdmins = async ({ recipients, orderId, customerName }) => {
     if (!recipients || !Array.isArray(recipients) || recipients.length === 0) {
@@ -31,7 +30,9 @@ export const sendOrderNotificationToAdmins = async ({ recipients, orderId, custo
 
     try {
         const info = await transporter.sendMail(mailOptions);
-        console.log(`Order notification email sent successfully to ${recipients.length} admins. Message ID: ${info.messageId}`);
+        console.log(
+            `Order notification email sent successfully to ${recipients.length} admins. Message ID: ${info.messageId}`
+        );
         return info;
     } catch (error) {
         console.error("Error sending order notification email to admins:", error);
@@ -58,7 +59,9 @@ export const sendCareerApplicationNotification = async ({
             contentType: resumeFile.mimetype
         });
     } else {
-        console.warn(`Resume file object was invalid or missing for applicant ${applicantEmail}. Email sent without attachment.`);
+        console.warn(
+            `Resume file object was invalid or missing for applicant ${applicantEmail}. Email sent without attachment.`
+        );
     }
 
     const mailOptions = {
@@ -78,14 +81,24 @@ export const sendCareerApplicationNotification = async ({
 
     try {
         const info = await transporter.sendMail(mailOptions);
-        console.log(`Career application notification email sent successfully to ${recipients.length} admins. Message ID: ${info.messageId}`);
+        console.log(
+            `Career application notification email sent successfully to ${recipients.length} admins. Message ID: ${info.messageId}`
+        );
         return info;
     } catch (error) {
         console.error("Error sending career application notification email:", error);
     }
 };
 
-export const sendContactInquiryNotification = async ({ recipients, fullName, companyName, email, phone, productCategory, message }) => {
+export const sendContactInquiryNotification = async ({
+    recipients,
+    fullName,
+    companyName,
+    email,
+    phone,
+    productCategory,
+    message
+}) => {
     if (!recipients || !Array.isArray(recipients) || recipients.length === 0) {
         console.warn("No admin recipients provided for contact inquiry notification.");
         return;
@@ -98,10 +111,10 @@ export const sendContactInquiryNotification = async ({ recipients, fullName, com
         html: `
             <h3>A new inquiry has been submitted via the website contact form.</h3>
             <p><strong>Full Name:</strong> ${fullName}</p>
-            ${companyName ? `<p><strong>Company Name:</strong> ${companyName}</p>` : ''}
+            ${companyName ? `<p><strong>Company Name:</strong> ${companyName}</p>` : ""}
             <p><strong>Email:</strong> ${email}</p>
             <p><strong>Phone Number:</strong> ${phone}</p>
-            ${productCategory ? `<p><strong>Product Category:</strong> ${productCategory}</p>` : ''}
+            ${productCategory ? `<p><strong>Product Category:</strong> ${productCategory}</p>` : ""}
             <p><strong>Message:</strong></p>
             <p style="white-space: pre-wrap;">${message}</p>
             <p>Please follow up as needed.</p>
@@ -110,7 +123,9 @@ export const sendContactInquiryNotification = async ({ recipients, fullName, com
 
     try {
         const info = await transporter.sendMail(mailOptions);
-        console.log(`Contact inquiry notification email sent successfully to ${recipients.length} admins. Message ID: ${info.messageId}`);
+        console.log(
+            `Contact inquiry notification email sent successfully to ${recipients.length} admins. Message ID: ${info.messageId}`
+        );
         return info;
     } catch (error) {
         console.error("Error sending contact inquiry notification email:", error);
@@ -129,7 +144,7 @@ export const sendAdminSignupInvitation = async ({ recipientEmail, adminName, fro
     const mailOptions = {
         from: `"TechWire Admin Team" <${process.env.GMAIL_USER}>`, // Customize sender name
         to: recipientEmail,
-        subject: 'Your Admin Account is Ready for Setup',
+        subject: "Your Admin Account is Ready for Setup",
         html: `
             <h3>Hello ${adminName},</h3>
             <p>A local administrator record has been created for you for the TechWire/TechWire Admin Panel.</p>
@@ -145,7 +160,9 @@ export const sendAdminSignupInvitation = async ({ recipientEmail, adminName, fro
 
     try {
         const info = await transporter.sendMail(mailOptions);
-        console.log(`Admin sign-up invitation email sent successfully to ${recipientEmail}. Message ID: ${info.messageId}`);
+        console.log(
+            `Admin sign-up invitation email sent successfully to ${recipientEmail}. Message ID: ${info.messageId}`
+        );
         return info;
     } catch (error) {
         console.error(`Error sending admin sign-up invitation email to ${recipientEmail}:`, error);
@@ -177,7 +194,9 @@ export const sendZipReportEmail = async ({ recipientEmail, reportUrl, originalZi
 
     try {
         const info = await transporter.sendMail(mailOptions);
-        console.log(`ZIP report notification email sent successfully to ${recipientEmail}. Message ID: ${info.messageId}`);
+        console.log(
+            `ZIP report notification email sent successfully to ${recipientEmail}. Message ID: ${info.messageId}`
+        );
         return info;
     } catch (error) {
         console.error(`Error sending ZIP report email to ${recipientEmail}:`, error);

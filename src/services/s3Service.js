@@ -1,9 +1,9 @@
 // File: src/services/s3Service.js
 
 import { S3Client, PutObjectCommand, HeadObjectCommand } from "@aws-sdk/client-s3";
-import fs from 'fs';
-import path from 'path';
-import dotenv from 'dotenv';
+import fs from "fs";
+import path from "path";
+import dotenv from "dotenv";
 
 dotenv.config();
 
@@ -11,8 +11,8 @@ const s3Client = new S3Client({
     region: process.env.AWS_REGION,
     credentials: {
         accessKeyId: process.env.AWS_ACCESS_KEY_ID,
-        secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
-    },
+        secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY
+    }
 });
 
 const BUCKET_NAME = process.env.S3_BUCKET_NAME;
@@ -24,13 +24,15 @@ const BUCKET_NAME = process.env.S3_BUCKET_NAME;
  */
 async function objectExists(key) {
     try {
-        await s3Client.send(new HeadObjectCommand({
-            Bucket: BUCKET_NAME,
-            Key: key,
-        }));
+        await s3Client.send(
+            new HeadObjectCommand({
+                Bucket: BUCKET_NAME,
+                Key: key
+            })
+        );
         return true;
     } catch (error) {
-        if (error.name === 'NotFound') {
+        if (error.name === "NotFound") {
             return false;
         }
         // Re-throw other errors
@@ -70,7 +72,7 @@ export const uploadBufferToS3 = async (fileBuffer, originalFilename, mimetype) =
         Bucket: BUCKET_NAME,
         Key: uniqueKey,
         Body: fileBuffer,
-        ContentType: mimetype,
+        ContentType: mimetype
     });
 
     try {

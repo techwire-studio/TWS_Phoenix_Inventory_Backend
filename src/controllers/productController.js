@@ -1,11 +1,11 @@
 // File: src/controllers/productController.js
 
-import { addProduct } from '../services/productService.js';
-import importCSV from '../services/csvImport.js';
-import prisma from '../config/db.js';
-import fs from 'fs';
-import { Prisma } from '@prisma/client';
-import { uploadBufferToS3 } from '../services/s3Service.js'; // Import the S3 service
+import { addProduct } from "../services/productService.js";
+import importCSV from "../services/csvImport.js";
+import prisma from "../config/db.js";
+import fs from "fs";
+import { Prisma } from "@prisma/client";
+import { uploadBufferToS3 } from "../services/s3Service.js"; // Import the S3 service
 
 /**
  * Controller to create a new product, now with image upload handling.
@@ -33,7 +33,7 @@ export const createProduct = async (req, res) => {
         }
         if (productData.chargeTax) {
             // Convert 'true'/'false' string to boolean
-            productData.chargeTax = productData.chargeTax === 'true';
+            productData.chargeTax = productData.chargeTax === "true";
         }
 
         const imageUrls = [];
@@ -42,7 +42,7 @@ export const createProduct = async (req, res) => {
             console.log(`Received ${files.length} files to upload.`);
 
             // Use Promise.all to upload all files in parallel
-            const uploadPromises = files.map(file => {
+            const uploadPromises = files.map((file) => {
                 const { buffer, originalname, mimetype } = file;
                 // We'll use the product ID as part of the filename for better organization
                 const uploadFilename = `${productData.id}_${originalname}`;
@@ -52,7 +52,7 @@ export const createProduct = async (req, res) => {
             const uploadResults = await Promise.all(uploadPromises);
 
             // Collect the URLs from the successful uploads
-            uploadResults.forEach(result => {
+            uploadResults.forEach((result) => {
                 imageUrls.push(result.url);
             });
         }
@@ -64,20 +64,24 @@ export const createProduct = async (req, res) => {
         const product = await addProduct(productData);
 
         console.log("Product and its variants with image URLs added successfully");
-        res.status(201).json({ message: 'Product added successfully', product });
-
+        res.status(201).json({ message: "Product added successfully", product });
     } catch (error) {
         console.error("Error creating product:", error.message);
-        if (error.message.includes("Missing required fields") || error.message.includes("already exists")) {
+        if (
+            error.message.includes("Missing required fields") ||
+            error.message.includes("already exists")
+        ) {
             return res.status(400).json({ error: error.message });
         }
-        if (error instanceof SyntaxError) { // Catches JSON.parse errors
-            return res.status(400).json({ error: 'Invalid JSON format for variants or other details.' });
+        if (error instanceof SyntaxError) {
+            // Catches JSON.parse errors
+            return res
+                .status(400)
+                .json({ error: "Invalid JSON format for variants or other details." });
         }
-        res.status(500).json({ error: 'Failed to add product', details: error.message });
+        res.status(500).json({ error: "Failed to add product", details: error.message });
     }
 };
-
 
 /**
  * Controller to upload a CSV file.
@@ -88,7 +92,7 @@ export const uploadCSV = async (req, res) => {
     }
 
     try {
-        const importMode = req.body.importMode || 'skip';
+        const importMode = req.body.importMode || "skip";
         await importCSV(req.file.path, importMode);
 
         // Clean up the uploaded file
@@ -116,7 +120,7 @@ export const getAllProducts = async (req, res) => {
             prisma.product.findMany({
                 skip,
                 take: limit,
-                orderBy: { createdAt: 'desc' },
+                orderBy: { createdAt: "desc" },
                 include: {
                     variants: true // Include the variants for each product
                 }
@@ -132,7 +136,6 @@ export const getAllProducts = async (req, res) => {
             totalPages,
             currentPage: page
         });
-
     } catch (error) {
         res.status(500).json({ error: "Failed to fetch products", details: error.message });
     }
@@ -154,8 +157,8 @@ export const searchProducts = async (req, res) => {
 
         const where = {
             OR: [
-                { title: { contains: query, mode: 'insensitive' } },
-                { id: { contains: query, mode: 'insensitive' } } // Search by Product ID
+                { title: { contains: query, mode: "insensitive" } },
+                { id: { contains: query, mode: "insensitive" } } // Search by Product ID
             ]
         };
 
@@ -164,7 +167,7 @@ export const searchProducts = async (req, res) => {
                 where,
                 skip,
                 take: limit,
-                orderBy: { createdAt: 'desc' },
+                orderBy: { createdAt: "desc" },
                 include: {
                     variants: true // Include variants in search results
                 }
@@ -180,7 +183,6 @@ export const searchProducts = async (req, res) => {
             totalPages,
             currentPage: page
         });
-
     } catch (error) {
         res.status(500).json({ error: "Failed to search products", details: error.message });
     }
@@ -204,7 +206,7 @@ export const getProductsByCategory = async (req, res) => {
         const where = {
             category: {
                 equals: categoryName,
-                mode: 'insensitive'
+                mode: "insensitive"
             }
         };
 
@@ -213,7 +215,7 @@ export const getProductsByCategory = async (req, res) => {
                 where,
                 skip,
                 take: limit,
-                orderBy: { createdAt: 'desc' },
+                orderBy: { createdAt: "desc" },
                 include: {
                     variants: true // Include variants
                 }
@@ -232,11 +234,10 @@ export const getProductsByCategory = async (req, res) => {
     } catch (error) {
         res.status(500).json({
             error: "Failed to fetch products by category",
-            details: error.message,
+            details: error.message
         });
     }
 };
-
 
 /**
  * Deletes a product and its associated variants.
@@ -252,19 +253,18 @@ export const deleteProduct = async (req, res) => {
         // Thanks to `onDelete: Cascade` in the schema,
         // deleting the product will automatically delete its variants.
         await prisma.product.delete({
-            where: { id: id },
+            where: { id: id }
         });
 
         res.status(200).json({ message: `Product with ID ${id} deleted successfully.` });
     } catch (error) {
-        if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') {
+        if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2025") {
             return res.status(404).json({ error: `Product with ID ${id} not found.` });
         }
         console.error("Error deleting product:", error);
-        res.status(500).json({ error: 'Failed to delete product', details: error.message });
+        res.status(500).json({ error: "Failed to delete product", details: error.message });
     }
 };
-
 
 /**
  * Updates a product and its variants.
@@ -284,42 +284,45 @@ export const updateProduct = async (req, res) => {
                     ...productData,
                     // Ensure Decimal fields are handled correctly if they are updatable
                     ...(productData.price && { price: new Prisma.Decimal(productData.price) }),
-                    ...(productData.taxRate && { taxRate: new Prisma.Decimal(productData.taxRate) }),
-                },
+                    ...(productData.taxRate && { taxRate: new Prisma.Decimal(productData.taxRate) })
+                }
             });
 
             // Step 2: Handle variant updates (simplified approach)
             if (variants && Array.isArray(variants)) {
                 // Delete existing variants for this product
                 await tx.productVariant.deleteMany({
-                    where: { productId: id },
+                    where: { productId: id }
                 });
 
                 // Create the new set of variants from the request
-                const variantsData = variants.map(v => ({
+                const variantsData = variants.map((v) => ({
                     size: v.size,
                     quantity: Number(v.quantity),
-                    productId: id,
+                    productId: id
                 }));
 
                 await tx.productVariant.createMany({
-                    data: variantsData,
+                    data: variantsData
                 });
             }
 
             // Step 3: Fetch the final updated product with its new variants
             return tx.product.findUnique({
                 where: { id: id },
-                include: { variants: true },
+                include: { variants: true }
             });
         });
 
-        res.status(200).json({ message: `Product with ID ${id} updated successfully.`, product: updatedProduct });
+        res.status(200).json({
+            message: `Product with ID ${id} updated successfully.`,
+            product: updatedProduct
+        });
     } catch (error) {
-        if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') {
+        if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2025") {
             return res.status(404).json({ error: `Product with ID ${id} not found.` });
         }
         console.error("Error updating product:", error);
-        res.status(500).json({ error: 'Failed to update product', details: error.message });
+        res.status(500).json({ error: "Failed to update product", details: error.message });
     }
 };

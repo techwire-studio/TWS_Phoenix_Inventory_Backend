@@ -2,8 +2,8 @@
 
 import prisma from "../config/db.js";
 import { db as firestore } from "../config/firebase.js";
-import { sendOrderNotificationToAdmins } from '../utils/mailer.js';
-import { Prisma } from '@prisma/client';
+import { sendOrderNotificationToAdmins } from "../utils/mailer.js";
+import { Prisma } from "@prisma/client";
 
 // Helper function to back up order data to Firebase (unchanged)
 const backupOrderToFirebase = async (order) => {
@@ -27,100 +27,111 @@ export const createOrder = async (req, res) => {
     const { products } = req.body;
 
     if (!clientId) {
-        return res.status(401).json({ error: 'Client authentication failed.' });
+        return res.status(401).json({ error: "Client authentication failed." });
     }
     if (!products || !Array.isArray(products) || products.length === 0) {
-        return res.status(400).json({ error: 'A non-empty products array is required.' });
+        return res.status(400).json({ error: "A non-empty products array is required." });
     }
 
     // --- MODIFICATION: Validate the new input structure ---
     for (const item of products) {
         if (!item.productId || !item.size || !item.quantity || item.quantity <= 0) {
-            return res.status(400).json({ error: 'Each item in products must have a valid productId, size, and a quantity greater than 0.' });
+            return res.status(400).json({
+                error: "Each item in products must have a valid productId, size, and a quantity greater than 0."
+            });
         }
     }
 
     try {
         const client = await prisma.client.findUnique({ where: { id: clientId } });
         if (!client) {
-            return res.status(404).json({ error: 'Client profile not found.' });
+            return res.status(404).json({ error: "Client profile not found." });
         }
 
-        const orderResult = await prisma.$transaction(async (tx) => {
-            // --- MODIFICATION: Find variants by productId and size, not by variantId ---
-            const variantsToFind = products.map(p => ({
-                productId: p.productId,
-                size: p.size,
-            }));
+        const orderResult = await prisma.$transaction(
+            async (tx) => {
+                // --- MODIFICATION: Find variants by productId and size, not by variantId ---
+                const variantsToFind = products.map((p) => ({
+                    productId: p.productId,
+                    size: p.size
+                }));
 
-            const dbVariants = await tx.productVariant.findMany({
-                where: {
-                    OR: variantsToFind,
-                },
-                include: { product: true }
-            });
-
-            // Create a map using a composite key for easy lookup
-            const dbVariantsMap = new Map(dbVariants.map(v => [`${v.productId}|${v.size}`, v]));
-            let totalAmount = new Prisma.Decimal(0);
-            const productsForOrderJson = [];
-
-            for (const item of products) {
-                // Find the corresponding variant from the database
-                const variant = dbVariantsMap.get(`${item.productId}|${item.size}`);
-
-                if (!variant) {
-                    throw new Error(`Product with ID ${item.productId} and size "${item.size}" not found.`);
-                }
-
-                if (variant.quantity < item.quantity) {
-                    throw new Error(`Not enough stock for ${variant.product.title} (Size: ${variant.size}). Requested: ${item.quantity}, Available: ${variant.quantity}.`);
-                }
-
-                await tx.productVariant.update({
-                    where: { id: variant.id }, // Use the internal variant.id for the update
-                    data: { quantity: { decrement: item.quantity } }
+                const dbVariants = await tx.productVariant.findMany({
+                    where: {
+                        OR: variantsToFind
+                    },
+                    include: { product: true }
                 });
 
-                const itemPrice = variant.product.price;
-                totalAmount = totalAmount.add(itemPrice.mul(item.quantity));
+                // Create a map using a composite key for easy lookup
+                const dbVariantsMap = new Map(
+                    dbVariants.map((v) => [`${v.productId}|${v.size}`, v])
+                );
+                let totalAmount = new Prisma.Decimal(0);
+                const productsForOrderJson = [];
 
-                productsForOrderJson.push({
-                    productId: variant.productId,
-                    variantId: variant.id, // We still store the variantId for our own records
-                    title: variant.product.title,
-                    size: variant.size,
-                    quantity: item.quantity,
-                    price: itemPrice,
+                for (const item of products) {
+                    // Find the corresponding variant from the database
+                    const variant = dbVariantsMap.get(`${item.productId}|${item.size}`);
+
+                    if (!variant) {
+                        throw new Error(
+                            `Product with ID ${item.productId} and size "${item.size}" not found.`
+                        );
+                    }
+
+                    if (variant.quantity < item.quantity) {
+                        throw new Error(
+                            `Not enough stock for ${variant.product.title} (Size: ${variant.size}). Requested: ${item.quantity}, Available: ${variant.quantity}.`
+                        );
+                    }
+
+                    await tx.productVariant.update({
+                        where: { id: variant.id }, // Use the internal variant.id for the update
+                        data: { quantity: { decrement: item.quantity } }
+                    });
+
+                    const itemPrice = variant.product.price;
+                    totalAmount = totalAmount.add(itemPrice.mul(item.quantity));
+
+                    productsForOrderJson.push({
+                        productId: variant.productId,
+                        variantId: variant.id, // We still store the variantId for our own records
+                        title: variant.product.title,
+                        size: variant.size,
+                        quantity: item.quantity,
+                        price: itemPrice
+                    });
+                }
+
+                const newOrder = await tx.order.create({
+                    data: {
+                        orderId: `${Math.floor(1000 + Math.random() * 9000)}`,
+                        firstName: client.name || "N/A",
+                        lastName: "",
+                        phoneNumber: client.phoneNumber || "N/A",
+                        email: client.email,
+                        products: productsForOrderJson,
+                        totalAmount: totalAmount.toNumber(),
+                        status: "Pending",
+                        clientId: client.id
+                    }
                 });
+
+                return newOrder;
+            },
+            {
+                maxWait: 5000,
+                timeout: 10000,
+                isolationLevel: Prisma.TransactionIsolationLevel.Serializable
             }
-
-            const newOrder = await tx.order.create({
-                data: {
-                    orderId: `${Math.floor(1000 + Math.random() * 9000)}`,
-                    firstName: client.name || 'N/A',
-                    lastName: '',
-                    phoneNumber: client.phoneNumber || 'N/A',
-                    email: client.email,
-                    products: productsForOrderJson,
-                    totalAmount: totalAmount.toNumber(),
-                    status: 'Pending',
-                    clientId: client.id,
-                }
-            });
-
-            return newOrder;
-        }, {
-            maxWait: 5000,
-            timeout: 10000,
-            isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
-        });
+        );
 
         // backupOrderToFirebase(orderResult);
 
         try {
             const adminsToNotify = await prisma.admin.findMany({ select: { email: true } });
-            const adminEmails = adminsToNotify.map(admin => admin.email);
+            const adminEmails = adminsToNotify.map((admin) => admin.email);
             if (adminEmails.length > 0) {
                 const customerName = `${client.name || client.email}`.trim();
                 sendOrderNotificationToAdmins({
@@ -134,10 +145,9 @@ export const createOrder = async (req, res) => {
         }
 
         res.status(201).json(orderResult);
-
     } catch (error) {
         console.error("Order creation failed:", error.message);
-        res.status(400).json({ error: error.message || 'Server error while placing the order.' });
+        res.status(400).json({ error: error.message || "Server error while placing the order." });
     }
 };
 
@@ -156,7 +166,7 @@ export const updateOrderStatus = async (req, res) => {
 
         const updatedOrder = await prisma.order.update({
             where: { orderId: orderId },
-            data: { status },
+            data: { status }
         });
 
         // backupOrderToFirebase(updatedOrder);
@@ -173,7 +183,7 @@ export const updateOrderDetails = async (req, res) => {
     try {
         const updatedOrder = await prisma.order.update({
             where: { orderId: orderId },
-            data: updateData,
+            data: updateData
         });
 
         // backupOrderToFirebase(updatedOrder);

@@ -1,12 +1,14 @@
-import { auth } from '../config/firebase.js';
+import { auth } from "../config/firebase.js";
 
 export const authenticateClient = async (req, res, next) => {
     const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-        return res.status(401).json({ error: "Unauthorized: No token provided or invalid format." });
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+        return res
+            .status(401)
+            .json({ error: "Unauthorized: No token provided or invalid format." });
     }
 
-    const idToken = authHeader.split('Bearer ')[1];
+    const idToken = authHeader.split("Bearer ")[1];
     if (!idToken) {
         return res.status(401).json({ error: "Unauthorized: Token missing after Bearer." });
     }
@@ -20,15 +22,16 @@ export const authenticateClient = async (req, res, next) => {
         req.client = decodedToken;
 
         next(); // The token is valid, proceed to the next function (the controller)
-
     } catch (error) {
         console.error("Error verifying Firebase ID token for client:", error.code, error.message);
-        if (error.code === 'auth/id-token-expired') {
+        if (error.code === "auth/id-token-expired") {
             return res.status(401).json({ error: "Unauthorized: Token has expired." });
         }
-        if (error.code === 'auth/argument-error' || error.code === 'auth/id-token-revoked') {
+        if (error.code === "auth/argument-error" || error.code === "auth/id-token-revoked") {
             return res.status(401).json({ error: "Unauthorized: Invalid token." });
         }
-        return res.status(500).json({ error: "Internal Server Error: Could not verify authentication." });
+        return res
+            .status(500)
+            .json({ error: "Internal Server Error: Could not verify authentication." });
     }
 };

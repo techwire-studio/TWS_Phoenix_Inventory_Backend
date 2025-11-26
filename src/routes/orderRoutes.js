@@ -14,7 +14,7 @@ const orderLimiter = rateLimit({
     windowMs: 5 * 60 * 1000, // 5 minutes
     max: 10, // Limit each IP to 10 order creation requests per windowMs
     message: { error: "Too many order requests. Please try again later." },
-    headers: false,
+    headers: false
 });
 
 const router = express.Router();
@@ -24,6 +24,6 @@ router.post("/", orderLimiter, authenticateClient, createOrder);
 router.get("/", authenticateAdmin, getOrders);
 router.patch("/:orderId/status", authenticateAdmin, updateOrderStatus);
 router.patch("/:orderId/details", authenticateAdmin, orderLimiter, updateOrderDetails);
-router.get('/completed', authenticateAdmin, getCompletedOrders)
+router.get("/completed", authenticateAdmin, getCompletedOrders);
 
 export default router;

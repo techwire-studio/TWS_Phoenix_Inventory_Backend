@@ -1,7 +1,7 @@
 // File: src/services/productService.js
 
-import prisma from '../config/db.js';
-import { Prisma } from '@prisma/client';
+import prisma from "../config/db.js";
+import { Prisma } from "@prisma/client";
 
 /**
  * Creates a new product and its variants in a single database transaction.
@@ -27,7 +27,9 @@ export const addProduct = async (productData) => {
 
     // --- Basic Validation ---
     if (!id || !title || !category || !price || variants.length === 0) {
-        throw new Error("Missing required fields: id, title, category, price, and at least one variant are required.");
+        throw new Error(
+            "Missing required fields: id, title, category, price, and at least one variant are required."
+        );
     }
     for (const variant of variants) {
         if (!variant.size || variant.quantity === undefined) {
@@ -51,19 +53,19 @@ export const addProduct = async (productData) => {
                     chargeTax: chargeTax,
                     dimensions: dimensions || Prisma.JsonNull,
                     weight: weight || Prisma.JsonNull,
-                    otherDetails: otherDetails || Prisma.JsonNull,
+                    otherDetails: otherDetails || Prisma.JsonNull
                 }
             });
 
             // Step 2: Prepare and create the associated ProductVariants
-            const variantsData = variants.map(variant => ({
+            const variantsData = variants.map((variant) => ({
                 size: variant.size,
                 quantity: Number(variant.quantity),
-                productId: createdProduct.id, // Link to the product we just created
+                productId: createdProduct.id // Link to the product we just created
             }));
 
             await tx.productVariant.createMany({
-                data: variantsData,
+                data: variantsData
             });
 
             // Step 3: Return the product with its variants included
@@ -71,8 +73,8 @@ export const addProduct = async (productData) => {
             const productWithVariants = await tx.product.findUnique({
                 where: { id: createdProduct.id },
                 include: {
-                    variants: true,
-                },
+                    variants: true
+                }
             });
 
             if (!productWithVariants) {
@@ -84,10 +86,9 @@ export const addProduct = async (productData) => {
         });
 
         return newProduct;
-
     } catch (error) {
         // Handle potential unique constraint errors (e.g., duplicate product ID)
-        if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+        if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
             throw new Error(`A product with ID '${id}' already exists.`);
         }
         // Re-throw other errors to be handled by the controller
