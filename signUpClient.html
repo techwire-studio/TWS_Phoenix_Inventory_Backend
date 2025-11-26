@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Client Sign-Up Tool</title>
+    <style>
+        body { font-family: sans-serif; line-height: 1.6; padding: 20px; }
+        input { margin-bottom: 10px; padding: 8px; width: 300px; }
+        button { padding: 10px 15px; cursor: pointer; }
+        h2 { margin-top: 20px; }
+        textarea { width: 90%; max-width: 800px; }
+        pre { background-color: #f4f4f4; padding: 15px; border: 1px solid #ccc; white-space: pre-wrap; word-wrap: break-word; }
+    </style>
+</head>
+<body>
+    <h1>Client Sign-Up & Registration Tool</h1>
+    <p>This tool will first create a user in Firebase, then immediately call the backend's <code>/api/clients/register</code> endpoint.</p>
+
+    <label for="name">Name:</label><br/>
+    <input type="text" id="name" placeholder="Enter full name" value="Test Client" /><br/>
+
+    <label for="phone">Phone Number:</label><br/>
+    <input type="text" id="phone" placeholder="Enter phone number" value="+18005551234" /><br/>
+
+    <label for="email">Email:</label><br/>
+    <input type="email" id="email" placeholder="Enter email" /><br/>
+
+    <label for="password">Password:</label><br/>
+    <input type="password" id="password" placeholder="Enter password (min. 6 characters)" /><br/>
+
+    <button onclick="signUpAndRegister()">Sign Up & Register Client</button>
+    <hr/>
+
+    <h2>Process Log:</h2>
+    <pre id="logArea">Awaiting sign-up...</pre>
+
+    <h2>Client ID Token:</h2>
+    <textarea id="tokenArea" rows="8" cols="80" readonly placeholder="Token will appear here upon success..."></textarea>
+
+    <!-- Import Firebase v9+ modular SDKs -->
+    <script type="module">
+        const firebaseConfig = {
+  apiKey: "AIzaSyBjreoZW8abcdxabdcMX2Wn21YYLNC9Aak",
+  authDomain: "abc.firebaseapp.com",
+  projectId: "abc",
+  storageBucket: "abc.firebasestorage.app",
+  messagingSenderId: "123450960247",
+  appId: "1:123456760247:web:12345678dce8d8b63ff072",
+  measurementId: "G-ABCD46G013"
+};
+
+        const BACKEND_URL = 'http://localhost:5000'; // Your backend server URL
+
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-app.js";
+        import { getAuth, createUserWithEmailAndPassword, getIdToken } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-auth.js";
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+
+        // Make the main function global for the button
+        window.signUpAndRegister = async () => {
+            const name = document.getElementById('name').value;
+            const phone = document.getElementById('phone').value;
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            const logArea = document.getElementById('logArea');
+            const tokenArea = document.getElementById('tokenArea');
+
+            logArea.textContent = 'Starting process...\n';
+            tokenArea.value = '';
+
+            if (!name || !email || !password || !phone) {
+                alert('Please fill out all fields.');
+                return;
+            }
+
+            // --- Step 1: Create user in Firebase ---
+            try {
+                logArea.textContent += 'Attempting to create user in Firebase...\n';
+                const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+                const user = userCredential.user;
+                logArea.textContent += `✅ Firebase user created successfully!\n  - UID: ${user.uid}\n  - Email: ${user.email}\n\n`;
+
+                // --- Step 2: Get the ID Token ---
+                logArea.textContent += 'Getting ID Token from Firebase...\n';
+                const idToken = await getIdToken(user);
+                tokenArea.value = idToken;
+                logArea.textContent += `✅ ID Token obtained.\n\n`;
+
+                // --- Step 3: Register user in our backend database ---
+                logArea.textContent += 'Calling backend /api/clients/register endpoint...\n';
+                const response = await fetch(`${BACKEND_URL}/api/clients/register`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${idToken}`
+                    },
+                    body: JSON.stringify({
+                        name: name,
+                        phoneNumber: phone
+                    })
+                });
+
+                const responseData = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(`Backend registration failed: ${JSON.stringify(responseData)}`);
+                }
+
+                logArea.textContent += `✅ Backend registration successful!\nResponse:\n${JSON.stringify(responseData, null, 2)}\n\n`;
+                logArea.textContent += '🎉 All steps completed successfully!';
+
+            } catch (error) {
+                console.error("Sign-up process error:", error);
+                logArea.textContent += `❌ ERROR: ${error.message}`;
+                alert(`Process failed: ${error.message}`);
+            }
+        };
+    </script>
+</body>
+</html>

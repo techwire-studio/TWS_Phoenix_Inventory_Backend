@@ -1,0 +1,141 @@
+// File: prisma/schema.prisma
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Product {
+  // Provided by the user from the "Product ID" field.
+  id              String   @id
+  title           String
+  // Storing the rich text editor's output (likely HTML or Markdown).
+  description     String?
+  // We can store up to 3 image URLs directly in an array of strings.
+  imageUrls       String[]
+  category        String
+  subCategory     String?
+  price           Decimal
+  taxRate         Decimal? // From "Tax-rate" field, optional
+  chargeTax       Boolean  @default(false) // From "Charge tax on this product" checkbox
+  // Using a flexible JSON field for Dimensions and Weight.
+  dimensions      Json?
+  weight          Json?
+  // Added optional JSON field for any other unstructured data.
+  otherDetails    Json?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  // A Product can have many Variants (e.g., different sizes).
+  // This is a one-to-many relationship.
+  variants ProductVariant[]
+
+  @@index([category])
+  @@index([subCategory])
+}
+
+// New model to handle "Sizes Available" (Product Variants)
+model ProductVariant {
+  id        Int     @id @default(autoincrement())
+  size      String  // e.g., "M", "S", "L"
+  quantity  Int     // e.g., 25
+
+  // This creates the relation back to the parent Product.
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // A variant is unique for a given product and size.
+  @@unique([productId, size])
+}
+
+model Order {
+  id              String   @id @default(cuid())
+  orderId         String   @unique
+  firstName       String 
+  lastName        String   
+  email           String?  
+  phoneNumber     String   
+  products        Json
+  totalAmount     Float?   @default(0.0)
+  status          String   @default("Pending")
+  trackingId      String?  @unique
+  invoiceNumber   String?
+  message         String?
+  shippingAddress Json?
+  billingAddress  Json?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  clientId String?
+  client   Client? @relation(fields: [clientId], references: [id])
+  @@index([status])
+}
+
+model Admin {
+  id          Int      @id @default(autoincrement())
+  firebaseUid String?  @unique
+  username    String   @unique
+  email       String   @unique
+  name        String
+  superAdmin  Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  uploadJobs  UploadJob[]
+}
+
+model CareerApplication {
+  id             String   @id @default(cuid())
+  firstName      String
+  lastName       String?
+  phoneNumber    String
+  email          String
+  areaOfInterest String
+  referred       Boolean  @default(false)
+  resumeUrl      String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([email])
+}
+
+model ContactInquiry {
+  id              String   @id @default(cuid())
+  fullName        String
+  companyName     String?
+  phoneNumber     String
+  email           String
+  productCategory String?
+  message         String
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([email])
+}
+model Client {
+  id          String   @id // The Firebase UID will be used as the ID
+  email       String   @unique
+  name        String?
+  phoneNumber String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // This establishes the one-to-many relationship
+  // A single Client can have many Orders
+  orders      Order[]
+}
+
+model UploadJob {
+  id                Int       @id @default(autoincrement())
+  originalZipName   String
+  status            String    // e.g., "processing", "completed", "failed"
+  reportCsvUrl      String?   // The public S3 URL to the generated report
+  uploadedByAdminId Int
+  uploadedByAdmin   Admin     @relation(fields: [uploadedByAdminId], references: [id])
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+}

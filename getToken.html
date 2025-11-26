@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Firebase Token Getter</title>
+</head>
+<body>
+    <h1>Firebase Login</h1>
+    <label for="email">Email:</label>
+    <input type="email" id="email" placeholder="Enter email" /><br/>
+    <label for="password">Password:</label>
+    <input type="password" id="password" placeholder="Enter password" /><br/>
+    <button onclick="signIn()">Sign In</button>
+    <hr/>
+    <h2>ID Token:</h2>
+    <textarea id="tokenArea" rows="10" cols="80" readonly placeholder="Token will appear here..."></textarea><br/>
+    <button onclick="copyToken()">Copy Token</button>
+
+    <script type="module">
+        // ==================================================================
+        // IMPORTANT: These are YOUR actual firebaseConfig values.
+        // ==================================================================
+        const firebaseConfig = {
+          apiKey: "AIzaSyA_60Ih6Wou4Ra7xENptWvaG-PQjF4lJ34",
+          authDomain: "phoenix-bdd7d.firebaseapp.com",
+          projectId: "phoenix-bdd7d",
+          storageBucket: "phoenix-bdd7d.firebasestorage.app",
+          messagingSenderId: "183044576730",
+          appId: "1:183044576730:web:4bdfb1ce26ee5992065ce3",
+          measurementId: "G-45SSZVJ41Q"
+        };
+        // ==================================================================
+
+        // Import functions from the SDKs
+        // Using a specific version for stability - you can update later if needed
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-app.js";
+        import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, getIdToken } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-auth.js";
+
+        // Initialize Firebase
+        try {
+            const app = initializeApp(firebaseConfig);
+            const auth = getAuth(app);
+            console.log("Firebase Initialized Successfully!");
+
+            // Make signIn function global for the button
+            window.signIn = async () => {
+                const email = document.getElementById('email').value;
+                const password = document.getElementById('password').value;
+                const tokenArea = document.getElementById('tokenArea');
+
+                if (!email || !password) {
+                    alert('Please enter both email and password.');
+                    return;
+                }
+
+                tokenArea.value = 'Attempting Sign in...';
+                try {
+                    const userCredential = await signInWithEmailAndPassword(auth, email, password);
+                    const user = userCredential.user;
+                    console.log('Sign in successful for user:', user.email, user.uid);
+
+                    tokenArea.value = 'Getting ID Token...';
+                    // Get the ID token
+                    const idToken = await getIdToken(user); // Gets the current token
+                    tokenArea.value = idToken;
+                    console.log('ID Token obtained.');
+
+                } catch (error) {
+                    console.error("Sign in error:", error.code, error.message);
+                    tokenArea.value = `Error: ${error.code} - ${error.message}`;
+                    alert(`Sign in failed: ${error.message}`);
+                }
+            };
+
+             // Make copy function global
+             window.copyToken = () => {
+                 const tokenArea = document.getElementById('tokenArea');
+                 if(tokenArea.value && tokenArea.value.startsWith('Error:')) {
+                     alert('Cannot copy error message.');
+                     return;
+                 }
+                 if(!tokenArea.value || tokenArea.value === 'Getting ID Token...' || tokenArea.value === 'Attempting Sign in...') {
+                     alert('No token available to copy.');
+                     return;
+                 }
+                 tokenArea.select();
+                 // Use the modern Clipboard API if available, otherwise fallback
+                 if (navigator.clipboard) {
+                    navigator.clipboard.writeText(tokenArea.value).then(() => {
+                        alert('Token copied to clipboard!');
+                    }).catch(err => {
+                        console.error('Failed to copy: ', err);
+                        alert('Failed to copy token automatically. Please copy manually.');
+                    });
+                 } else {
+                    // Fallback for older browsers
+                    try {
+                        document.execCommand('copy');
+                        alert('Token copied to clipboard! (fallback method)');
+                    } catch (err) {
+                        console.error('Fallback copy failed: ', err);
+                        alert('Failed to copy token automatically. Please copy manually.');
+                    }
+                 }
+             }
+
+            // Optional: Listen for auth state changes
+            onAuthStateChanged(auth, (user) => {
+                if (user) {
+                    console.log("Auth State Change: User is signed in:", user.uid);
+                    // Could potentially auto-refresh token here if needed, but usually done on demand
+                } else {
+                    console.log("Auth State Change: User is signed out");
+                    document.getElementById('tokenArea').value = ''; // Clear token display on sign out
+                }
+            });
+
+        } catch (initError) {
+             console.error("Firebase Initialization Error:", initError);
+             alert("FATAL ERROR: Could not initialize Firebase. Check console and firebaseConfig.");
+             document.body.innerHTML = '<h1>Firebase Initialization Failed. Check Console.</h1>'; // Prevent UI interaction
+        }
+
+    </script>
+</body>
+</html>
