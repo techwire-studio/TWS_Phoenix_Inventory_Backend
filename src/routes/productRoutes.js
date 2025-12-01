@@ -7,6 +7,7 @@ import {
     searchProducts,
     getProductsByCategory,
     deleteProduct,
+    getProductById,
     updateProduct
 } from "../controllers/productController.js";
 import { authenticateAdmin, authenticateSuperAdmin } from "../middleware/authMiddleware.js";
@@ -52,6 +53,7 @@ router.put("/:id", authenticateAdmin, authenticateSuperAdmin, updateProduct);
 
 // Get all products with pagination
 router.get("/all-products", getAllProducts);
+router.get("/:id", getProductById);
 
 // Search for products by title or ID
 router.get("/search", searchProducts);

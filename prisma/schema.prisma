@@ -11,24 +11,24 @@ datasource db {
 
 model Product {
   // Provided by the user from the "Product ID" field.
-  id              String   @id
-  title           String
+  id           String   @id
+  title        String
   // Storing the rich text editor's output (likely HTML or Markdown).
-  description     String?
+  description  String?
   // We can store up to 3 image URLs directly in an array of strings.
-  imageUrls       String[]
-  category        String
-  subCategory     String?
-  price           Decimal
-  taxRate         Decimal? // From "Tax-rate" field, optional
-  chargeTax       Boolean  @default(false) // From "Charge tax on this product" checkbox
+  imageUrls    String[]
+  category     String
+  subCategory  String?
+  price        Decimal
+  taxRate      Decimal? // From "Tax-rate" field, optional
+  chargeTax    Boolean  @default(false) // From "Charge tax on this product" checkbox
   // Using a flexible JSON field for Dimensions and Weight.
-  dimensions      Json?
-  weight          Json?
+  dimensions   Json?
+  weight       Json?
   // Added optional JSON field for any other unstructured data.
-  otherDetails    Json?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  otherDetails Json?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
   // A Product can have many Variants (e.g., different sizes).
   // This is a one-to-many relationship.
@@ -40,9 +40,9 @@ model Product {
 
 // New model to handle "Sizes Available" (Product Variants)
 model ProductVariant {
-  id        Int     @id @default(autoincrement())
-  size      String  // e.g., "M", "S", "L"
-  quantity  Int     // e.g., 25
+  id       Int    @id @default(autoincrement())
+  size     String // e.g., "M", "S", "L"
+  quantity Int // e.g., 25
 
   // This creates the relation back to the parent Product.
   productId String
@@ -58,10 +58,9 @@ model ProductVariant {
 model Order {
   id              String   @id @default(cuid())
   orderId         String   @unique
-  firstName       String 
-  lastName        String   
-  email           String?  
-  phoneNumber     String   
+  name            String?
+  email           String?
+  phoneNumber     String
   products        Json
   totalAmount     Float?   @default(0.0)
   status          String   @default("Pending")
@@ -72,19 +71,28 @@ model Order {
   billingAddress  Json?
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
-  clientId String?
-  client   Client? @relation(fields: [clientId], references: [id])
+  clientId        String?
+  client          Client?  @relation(fields: [clientId], references: [id])
+
+  // Fields for Razorpay integration
+  paymentStatus     String? @default("PENDING")
+  razorpayPaymentId String? @unique
+  razorpayOrderId   String? @unique
+  razorpaySignature String?
+
   @@index([status])
+  @@index([razorpayOrderId])
+  @@index([clientId])
 }
 
 model Admin {
-  id          Int      @id @default(autoincrement())
-  firebaseUid String?  @unique
-  username    String   @unique
-  email       String   @unique
+  id          Int         @id @default(autoincrement())
+  firebaseUid String?     @unique
+  username    String      @unique
+  email       String      @unique
   name        String
-  superAdmin  Boolean  @default(false)
-  createdAt   DateTime @default(now())
+  superAdmin  Boolean     @default(false)
+  createdAt   DateTime    @default(now())
   uploadJobs  UploadJob[]
 }
 
@@ -116,26 +124,28 @@ model ContactInquiry {
 
   @@index([email])
 }
+
 model Client {
-  id          String   @id // The Firebase UID will be used as the ID
+  id          String   @id @default(cuid())
   email       String   @unique
   name        String?
   phoneNumber String?
+  password    String
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
   // This establishes the one-to-many relationship
   // A single Client can have many Orders
-  orders      Order[]
+  orders Order[]
 }
 
 model UploadJob {
-  id                Int       @id @default(autoincrement())
+  id                Int      @id @default(autoincrement())
   originalZipName   String
-  status            String    // e.g., "processing", "completed", "failed"
-  reportCsvUrl      String?   // The public S3 URL to the generated report
+  status            String // e.g., "processing", "completed", "failed"
+  reportCsvUrl      String? // The public S3 URL to the generated report
   uploadedByAdminId Int
-  uploadedByAdmin   Admin     @relation(fields: [uploadedByAdminId], references: [id])
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
+  uploadedByAdmin   Admin    @relation(fields: [uploadedByAdminId], references: [id])
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
 }

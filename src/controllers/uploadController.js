@@ -171,56 +171,127 @@ export const getAllUploadJobs = async (req, res) => {
 
 const uploadController = async (req, res) => {
     console.log("CSV upload request received");
-    console.log("Request file:", req.file ? req.file.originalname : "No file uploaded");
     if (!req.file) {
         return res.status(400).json({ error: "No CSV file uploaded." });
     }
 
     const filePath = req.file.path;
-    const products = [];
+    const rows = [];
 
     try {
-        // 1. Read and parse the CSV file
+        // Read CSV
         await new Promise((resolve, reject) => {
             fs.createReadStream(filePath)
                 .pipe(csv())
-                .on("data", (row) => {
-                    // Parse and push into array
-                    products.push({
-                        id: row.id,
-                        title: row.title,
-                        description: row.description || null,
-                        imageUrls: row.imageUrls
-                            ? row.imageUrls.split(";").map((url) => url.trim())
-                            : [],
-                        category: row.category,
-                        subCategory: row.subCategory || null,
-                        price: new Decimal(row.price),
-                        taxRate: row.taxRate ? new Decimal(row.taxRate) : null,
-                        chargeTax: row.chargeTax === "true",
-                        dimensions: row.dimensions ? JSON.parse(row.dimensions) : null,
-                        weight: row.weight ? JSON.parse(row.weight) : null,
-                        otherDetails: row.otherDetails ? JSON.parse(row.otherDetails) : null
-                    });
-                })
+                .on("data", (row) => rows.push(row))
                 .on("end", resolve)
                 .on("error", reject);
         });
 
-        // 2. Bulk insert using Prisma
-        const createdProducts = await prisma.product.createMany({
-            data: products,
+        const seenProducts = new Map(); // productId -> product data
+        const variants = []; // array of product variants
+
+        for (const row of rows) {
+            const productId = row.id;
+
+            // Known base product columns
+            const productBaseColumns = [
+                "id",
+                "title",
+                "description",
+                "imageUrls",
+                "category",
+                "subCategory",
+                "price",
+                "taxRate",
+                "chargeTax",
+                "dimension_height",
+                "dimension_width",
+                "dimension_depth",
+                "weight_value",
+                "weight_unit",
+                "size",
+                "quantity"
+            ];
+
+            // Build product only once per ID
+            if (!seenProducts.has(productId)) {
+                const dimensions = {
+                    height: row.dimension_height ? parseFloat(row.dimension_height) : null,
+                    width: row.dimension_width ? parseFloat(row.dimension_width) : null,
+                    depth: row.dimension_depth ? parseFloat(row.dimension_depth) : null
+                };
+
+                const weight = {
+                    value: row.weight_value ? parseFloat(row.weight_value) : null,
+                    unit: row.weight_unit || null
+                };
+
+                const otherDetails = {};
+                for (const col in row) {
+                    if (!productBaseColumns.includes(col) && row[col] !== "") {
+                        otherDetails[col] = row[col];
+                    }
+                }
+
+                seenProducts.set(productId, {
+                    id: productId,
+                    title: row.title,
+                    description: row.description || null,
+                    imageUrls: row.imageUrls
+                        ? row.imageUrls.split(/[,;]/).map((url) => url.trim())
+                        : [],
+                    category: row.category,
+                    subCategory: row.subCategory || null,
+                    price: row.price ? new Decimal(row.price) : null,
+                    taxRate: row.taxRate ? new Decimal(row.taxRate) : null,
+                    chargeTax: row.chargeTax === "true",
+                    dimensions,
+                    weight,
+                    otherDetails: Object.keys(otherDetails).length ? otherDetails : null
+                });
+            }
+
+            // Handle variant (must have size + quantity)
+            if (row.size && row.quantity) {
+                variants.push({
+                    size: row.size,
+                    quantity: parseInt(row.quantity, 10),
+                    productId: productId
+                });
+            }
+        }
+
+        // Insert products
+        const productArray = Array.from(seenProducts.values());
+
+        await prisma.product.createMany({
+            data: productArray,
             skipDuplicates: true
         });
 
+        // Insert variants
+        // skip duplicates based on (productId, size)
+        for (const variant of variants) {
+            await prisma.productVariant.upsert({
+                where: {
+                    productId_size: {
+                        productId: variant.productId,
+                        size: variant.size
+                    }
+                },
+                create: variant,
+                update: { quantity: variant.quantity }
+            });
+        }
+
         res.status(200).json({
-            message: `${createdProducts.count} products inserted successfully.`
+            message: `${productArray.length} products + ${variants.length} variants processed successfully.`
         });
     } catch (error) {
         console.error("CSV upload error:", error);
         res.status(500).json({ error: "Failed to process the CSV file." });
     } finally {
-        // Clean up
         fs.unlink(filePath, () => {});
     }
 };

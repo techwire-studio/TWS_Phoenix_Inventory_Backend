@@ -23,7 +23,7 @@ router.get("/jobs", authenticateAdmin, getAllUploadJobs);
 // Add Multer middleware for CSV upload
 router.post(
     "/csv",
-    authenticateAdmin,
+
     upload.single("csvfile"), // Specify the form field name
     uploadController
 );

@@ -23,7 +23,7 @@ const backupOrderToFirebase = async (order) => {
 // In src/controllers/orderController.js
 
 export const createOrder = async (req, res) => {
-    const { uid: clientId } = req.client;
+    const clientId = req.client.id;
     const { products } = req.body;
 
     if (!clientId) {
@@ -196,7 +196,10 @@ export const updateOrderDetails = async (req, res) => {
 
 export const getOrders = async (req, res) => {
     try {
-        const orders = await prisma.order.findMany({ orderBy: { createdAt: "desc" } });
+        const orders = await prisma.order.findMany({
+            orderBy: { createdAt: "desc" },
+            where: { clientId: req.client.id }
+        });
         res.json(orders);
     } catch (error) {
         res.status(500).json({ error: "Failed to fetch orders." });

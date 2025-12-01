@@ -1,37 +1,45 @@
-import { auth } from "../config/firebase.js";
+import jwt from "jsonwebtoken";
+import dotenv from "dotenv";
 
-export const authenticateClient = async (req, res, next) => {
-    const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith("Bearer ")) {
-        return res
-            .status(401)
-            .json({ error: "Unauthorized: No token provided or invalid format." });
-    }
+dotenv.config();
 
-    const idToken = authHeader.split("Bearer ")[1];
-    if (!idToken) {
-        return res.status(401).json({ error: "Unauthorized: Token missing after Bearer." });
+const JWT_SECRET = process.env.JWT_SECRET;
+const CLIENT_COOKIE_NAME = "client_token";
+
+export const authenticateClient = (req, res, next) => {
+    const token = req.cookies?.[CLIENT_COOKIE_NAME];
+
+    if (!token) {
+        return res.status(401).json({ error: "Access denied. No token provided. Please log in." });
     }
 
     try {
-        // Verify the token using the Firebase Admin SDK
-        const decodedToken = await auth.verifyIdToken(idToken);
+        const decoded = jwt.verify(token, JWT_SECRET);
 
-        // Attach the entire decoded token to the request object.
-        // This will give our controllers access to the client's UID, email, etc.
-        req.client = decodedToken;
+        req.client = {
+            id: decoded.id,
+            email: decoded.email,
+            role: decoded.role
+        };
 
-        next(); // The token is valid, proceed to the next function (the controller)
+        next();
     } catch (error) {
-        console.error("Error verifying Firebase ID token for client:", error.code, error.message);
-        if (error.code === "auth/id-token-expired") {
-            return res.status(401).json({ error: "Unauthorized: Token has expired." });
+        console.error("Client authentication error:", error.message);
+        if (error.name === "TokenExpiredError") {
+            res.clearCookie(CLIENT_COOKIE_NAME, {
+                httpOnly: true,
+                secure: true,
+                sameSite: "None",
+                path: "/"
+            });
+            return res.status(401).json({ error: "Token expired. Please log in again." });
         }
-        if (error.code === "auth/argument-error" || error.code === "auth/id-token-revoked") {
-            return res.status(401).json({ error: "Unauthorized: Invalid token." });
-        }
-        return res
-            .status(500)
-            .json({ error: "Internal Server Error: Could not verify authentication." });
+        res.clearCookie(CLIENT_COOKIE_NAME, {
+            httpOnly: true,
+            secure: true,
+            sameSite: "None",
+            path: "/"
+        });
+        return res.status(401).json({ error: "Invalid token. Please log in." });
     }
 };

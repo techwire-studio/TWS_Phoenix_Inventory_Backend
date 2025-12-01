@@ -1,5 +1,6 @@
 import { auth } from "../config/firebase.js";
 import prisma from "../config/db.js";
+
 export const authenticateAdmin = async (req, res, next) => {
     const authHeader = req.headers.authorization;
     if (!authHeader || !authHeader.startsWith("Bearer ")) {

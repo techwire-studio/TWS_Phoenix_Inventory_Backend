@@ -142,6 +142,30 @@ export const getAllProducts = async (req, res) => {
 };
 
 /**
+ * Fetch a single product by ID, including its variants.
+ */
+export const getProductById = async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        const product = await prisma.product.findUnique({
+            where: { id },
+            include: {
+                variants: true
+            }
+        });
+
+        if (!product) {
+            return res.status(404).json({ error: "Product not found" });
+        }
+
+        res.status(200).json(product);
+    } catch (error) {
+        res.status(500).json({ error: "Failed to fetch product", details: error.message });
+    }
+};
+
+/**
  * Searches for products by title or ID, with pagination.
  */
 export const searchProducts = async (req, res) => {
